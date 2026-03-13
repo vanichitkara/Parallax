@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ShopEasy - Catalogue</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">🛒</div>
+      <button class="hamburger" onclick="toggleMenu()">☰</button>
+      <nav class="nav" id="main-nav">
+        <div class="nav-link" onclick="location.href='index.html'">Hm</div>
+        <div class="nav-link active" onclick="location.href='products.html'">Ctlg</div>
+        <div class="nav-link" onclick="location.href='checkout.html'">CO</div>
+        <div class="nav-link">?</div>
+      </nav>
+      <input class="search-box" type="text" placeholder="Search SKU or EAN..." />
+    </div>
+  </header>
+
+  <main style="padding: 24px 40px;">
+    <!-- FLAW: Filter panel uses only color to indicate selection (no other visual cue) -->
+    <div class="filter-bar">
+      <span class="filter-label">FLTR:</span>
+      <button class="filter-btn selected-red">Electronics</button>
+      <button class="filter-btn">Clothing</button>
+      <button class="filter-btn">Home</button>
+      <button class="filter-btn selected-green">On Sale</button>
+      <button class="filter-btn">Top Rated</button>
+    </div>
+
+    <!-- FLAW: Sort is unlabeled -->
+    <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+      <select class="sort-select">
+        <option>↑ Pr</option>
+        <option>↓ Pr</option>
+        <option>A-Z</option>
+        <option>★</option>
+      </select>
+    </div>
+
+    <div class="product-grid large">
+      <!-- FLAW: "Buy Now" button nearly invisible (matches background) -->
+      <!-- FLAW: No product descriptions -->
+      <!-- FLAW: Jargon-heavy attributes -->
+      <div class="product-card">
+        <img src="https://via.placeholder.com/220x160/1a1a2e/333?text=Item+1" alt="" />
+        <div class="prod-title">Wireless Hdphn. MDL-X7 (BT 5.2, ANC, IPX4)</div>
+        <div class="prod-price">$79.99 <span class="was-price">$110</span></div>
+        <div style="font-size:9px; color:#555;">Stock: 3 | SKU: HX7-BLK | EAN: 1234567890123</div>
+        <button class="btn-buy-invisible">Buy Now</button>
+        <button class="btn-add">Add to Basket</button>
+      </div>
+
+      <div class="product-card">
+        <img src="https://via.placeholder.com/220x160/1a1a2e/444?text=Item+2" alt="" />
+        <div class="prod-title">USB-C Hub 7-in-1 (4K HDMI, PD 100W, 3×USB3.1)</div>
+        <div class="prod-price">$39.99</div>
+        <div style="font-size:9px; color:#555;">Stock: 22 | SKU: HUB7C | EAN: 9876543210987</div>
+        <button class="btn-buy-invisible">Buy Now</button>
+        <button class="btn-add">Add to Basket</button>
+      </div>
+
+      <div class="product-card">
+        <img src="https://via.placeholder.com/220x160/1a1a2e/555?text=Item+3" alt="" />
+        <div class="prod-title">M.2 NVMe SSD 1TB (PCIe 4.0, 7000MB/s R)</div>
+        <div class="prod-price">$119.00</div>
+        <div style="font-size:9px; color:#555;">Stock: 8 | SKU: SSD1T | EAN: 1122334455667</div>
+        <button class="btn-buy-invisible">Buy Now</button>
+        <button class="btn-add">Add to Basket</button>
+      </div>
+
+      <div class="product-card">
+        <img src="https://via.placeholder.com/220x160/1a1a2e/666?text=Item+4" alt="" />
+        <div class="prod-title">Portable Charger 20000mAh (PD 45W, 2×A+C)</div>
+        <div class="prod-price">$49.99 <span class="was-price">$65</span></div>
+        <div style="font-size:9px; color:#555;">Stock: 15 | SKU: PB20K | EAN: 5544332211009</div>
+        <button class="btn-buy-invisible">Buy Now</button>
+        <button class="btn-add">Add to Basket</button>
+      </div>
+    </div>
+
+    <!-- FLAW: Pagination with no context (no "page 1 of X") -->
+    <div class="pagination">
+      <button>«</button>
+      <button class="pg-active">1</button>
+      <button>2</button>
+      <button>3</button>
+      <button>»</button>
+    </div>
+  </main>
+
+  <script>function toggleMenu() { document.getElementById('main-nav').classList.toggle('open'); }</script>
+</body>
+</html>

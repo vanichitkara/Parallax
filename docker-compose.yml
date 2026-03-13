@@ -1,0 +1,53 @@
+# ================================================================
+# Parallax — docker-compose.yml
+# Local full-stack development + testing before Cloud Run push
+# ================================================================
+
+version: "3.9"
+
+services:
+
+  # ── Backend: FastAPI + Playwright ──────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parallax-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GOOGLE_CLOUD_PROJECT=parallax-490117
+      - GCS_BUCKET=${GCS_BUCKET:-parallax-screenshots}
+      - PORT=8000
+    volumes:
+      # Mount output dir so screenshots persist across restarts
+      - ./output:/app/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Frontend: Nginx serving Vite build ─────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Points the React app at the backend (via browser, so localhost)
+        VITE_API_URL: http://localhost:8000
+    container_name: parallax-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    name: parallax-network

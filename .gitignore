@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output
+output/
+screenshots/
+
+# Node (for frontend)
+node_modules/
+frontend/dist/
+
+# Terraform state (can contain sensitive infra data)
+cloud/terraform/.terraform/
+cloud/terraform/*.tfstate
+cloud/terraform/*.tfstate.backup
+cloud/terraform/.terraform.lock.hcl
+
+# Docker
+.docker/
+
+# Playwright
+playwright-report/
+test-results/

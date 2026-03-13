@@ -1,0 +1,29 @@
+# ================================================================
+# Parallax — Frontend Dockerfile
+# Nginx serving Vite build
+# ================================================================
+
+# Stage 1: Build the React app
+FROM node:20-slim AS builder
+
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+# Inject API URL at build time (overridden in docker-compose / Cloud Run)
+ARG VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# Stage 2: Serve with nginx
+FROM nginx:alpine
+
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Custom nginx config: SPA routing + proxy /api → backend
+COPY cloud/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

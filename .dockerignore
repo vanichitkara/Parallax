@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Output (screenshots) - kept locally, not in image
+output/
+
+# Secrets
+.env
+
+# Git
+.git/
+.gitignore
+
+# Docs / misc
+*.md
+docs/

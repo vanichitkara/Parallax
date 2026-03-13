@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "parallax"
+version = "0.1.0"
+description = "AI-powered UX testing with diverse persona agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[tool.setuptools.packages.find]
+include = ["parallax_agent*", "personas*", "tools*", "models*", "api*"]

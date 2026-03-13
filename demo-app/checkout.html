@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ShopEasy - Checkout</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">🛒</div>
+      <button class="hamburger" onclick="toggleMenu()">☰</button>
+      <nav class="nav" id="main-nav">
+        <div class="nav-link" onclick="location.href='index.html'">Hm</div>
+        <div class="nav-link" onclick="location.href='products.html'">Ctlg</div>
+        <div class="nav-link active" onclick="location.href='checkout.html'">CO</div>
+        <div class="nav-link">?</div>
+      </nav>
+    </div>
+  </header>
+
+  <main style="padding: 24px 40px; max-width: 680px; margin: 0 auto;">
+    <h1 style="font-size:1.3rem; margin-bottom:20px;">CO / Checkout</h1>
+
+    <form onsubmit="return handleCheckout(event)">
+      <!-- FLAW: Form labels use jargon instead of plain English -->
+      <div class="form-section">
+        <h2 class="section-title">Billing Details</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <!-- FLAW: Labels are not linked to inputs (no `for` attr) -->
+            <label>Given Name *</label>
+            <input type="text" class="form-input" placeholder="Titular Name" required />
+          </div>
+          <div class="form-group">
+            <label>Surname *</label>
+            <input type="text" class="form-input" placeholder="Patronym" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Electronic Mail Address *</label>
+          <input type="email" class="form-input" placeholder="addr@domain.tld" required />
+        </div>
+
+        <div class="form-group">
+          <label>Mobile / Landline (with IDD prefix) *</label>
+          <input type="tel" class="form-input" placeholder="+[CC][AC][LOCAL]" />
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="section-title">Delivery Address</h2>
+        <div class="form-group">
+          <label>Address Line 1 (Bldg/Unit/Flat) *</label>
+          <input type="text" class="form-input" placeholder="Apt/Suite/Unit No." required />
+        </div>
+        <div class="form-group">
+          <label>Address Line 2 (Street, Thoroughfare) *</label>
+          <input type="text" class="form-input" placeholder="Street/Road/Lane" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>City/Town/Municipality *</label>
+            <input type="text" class="form-input" required />
+          </div>
+          <div class="form-group">
+            <label>PIN / ZIP / Postcode *</label>
+            <input type="text" class="form-input" placeholder="Alphanumeric" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="section-title">Payment Instrument</h2>
+        <div class="form-group">
+          <label>PAN (Primary Account Number) *</label>
+          <input type="text" class="form-input" placeholder="16-digit PAN" maxlength="19" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expiry (MM/YY) *</label>
+            <input type="text" class="form-input" placeholder="MM/YY" maxlength="5" required />
+          </div>
+          <div class="form-group">
+            <label>CVV2/CVC2 *</label>
+            <!-- FLAW: No explanation of what CVV2 is -->
+            <input type="password" class="form-input" placeholder="***" maxlength="4" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- FLAW: Error messages are red text with no icon — invisible to colorblind users -->
+      <div id="error-msg" class="error-msg" style="display:none;">
+        ⚠ Transaction declined. Verify PAN/CVV2 and retry.
+      </div>
+
+      <!-- FLAW: Submit button has no visible disabled state feedback -->
+      <!-- FLAW: Button says "Confirm & Remit" instead of "Place Order" -->
+      <button type="submit" class="btn-submit">Confirm &amp; Remit →</button>
+
+      <!-- FLAW: Fine print is intentionally unreadable -->
+      <p style="font-size:8px; color:#2a2a2a; margin-top:8px; line-height:1.3;">
+        By clicking Confirm & Remit you authorise ShopEasy Ltd to charge the stated amount to your payment instrument. All transactions are final. Refunds subject to 14-day return policy. By proceeding you agree to our Terms, Privacy, and Cookies policies. ShopEasy is not responsible for delivery failure due to incorrect address entry.
+      </p>
+    </form>
+  </main>
+
+  <script>
+    function toggleMenu() { document.getElementById('main-nav').classList.toggle('open'); }
+    function handleCheckout(e) {
+      e.preventDefault();
+      document.getElementById('error-msg').style.display = 'block';
+      return false;
+    }
+  </script>
+</body>
+</html>

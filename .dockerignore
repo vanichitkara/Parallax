@@ -22,3 +22,6 @@ output/
 # Docs / misc
 *.md
 docs/
+demo-app/
+cloud/
+tests/

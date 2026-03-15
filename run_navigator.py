@@ -143,7 +143,7 @@ You will be shown screenshots of the website. After each screenshot, respond wit
         {{
             "title": "Short issue title",
             "description": "Detailed description from my persona's perspective",
-            "severity": "critical/high/medium/low/info",
+            "severity": "critical/high/medium/low/genfo",
             "category": "navigation/readability/accessibility/visual_design/interaction/language/color/mobile/cognitive_load"
         }}
     ],

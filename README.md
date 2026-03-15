@@ -80,7 +80,7 @@ bash cloud/deploy.sh
 | Component       | Technology                 | Why                                               |
 | --------------- | -------------------------- | ------------------------------------------------- |
 | Agent Framework | **Google ADK**             | Multi-agent orchestration, required by hackathon  |
-| AI Model        | **Gemini 2.0 Flash**       | Fast vision analysis, cost-effective              |
+| AI Model        | **Gemini 2.5 Flash**       | Fast vision analysis, cost-effective              |
 | Browser         | **Playwright**             | Headless screenshots + interactions               |
 | Backend         | **FastAPI**                | Async Python, Cloud Run ready                     |
 | Frontend        | **React + Vite**           | Live dashboard                                    |

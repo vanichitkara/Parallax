@@ -148,19 +148,24 @@ export default function App() {
             {history
               .filter(r => r.run_id !== activeRunId)
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-              .map(run => (
-              <button
-                key={run.run_id}
-                className={`history-item ${runId === run.run_id ? 'active' : ''}`}
-                onClick={() => handleSelectRun(run)}
-              >
-                <div className="history-run-id">run: {run.run_id}</div>
-                <div className="history-meta">
-                  {new Date(run.created_at).toLocaleDateString()} {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {run.personas?.length} agent{run.personas?.length > 1 ? 's' : ''}
-                </div>
-                <div className={`history-status status-${run.status}`}>{run.status}</div>
-              </button>
-            ))}
+              .map(run => {
+                const title = run.task || run.url || `run: ${run.run_id}`
+                return (
+                  <button
+                    key={run.run_id}
+                    className={`history-item ${runId === run.run_id ? 'active' : ''}`}
+                    onClick={() => handleSelectRun(run)}
+                  >
+                    <div className="history-run-id">
+                      {title.length > 80 ? `${title.slice(0, 77)}…` : title}
+                    </div>
+                    <div className="history-meta">
+                      {new Date(run.created_at).toLocaleDateString()} {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {run.personas?.length} agent{run.personas?.length > 1 ? 's' : ''}
+                    </div>
+                    <div className={`history-status status-${run.status}`}>{run.status}</div>
+                  </button>
+                )
+              })}
             {history.length === 0 && !running && <div className="history-empty">No previous runs</div>}
           </div>
         </nav>

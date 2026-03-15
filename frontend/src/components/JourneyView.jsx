@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const PERSONA_META = {
-  martha: { emoji: '👵', label: 'Martha' },
-  raj:    { emoji: '👨‍💻', label: 'Raj' },
-  yuki:   { emoji: '🌸', label: 'Yuki' },
-  sam:    { emoji: '♿', label: 'Sam' },
-  dev:    { emoji: '📱', label: 'Dev' },
-  priya:  { emoji: '🏪', label: 'Priya' },
-  carlos: { emoji: '🔨', label: 'Carlos' },
+  martha: { emoji: '👵', label: 'Martha', age: 72, desc: 'Retired schoolteacher. Uses iPad for email and Facebook only. Low tech proficiency.' },
+  raj:    { emoji: '👨‍💻', label: 'Raj', age: 28, desc: 'Senior software engineer. Power user of every app. High technical skills.' },
+  yuki:   { emoji: '🌸', label: 'Yuki', age: 34, desc: 'Marketing manager. English is second language. Intermediate technical proficiency.' },
+  sam:    { emoji: '♿', label: 'Sam', age: 40, desc: 'Accountant. Legally blind, uses screen reader (JAWS). Screen reader accessibility testing.' },
+  dev:    { emoji: '📱', label: 'Dev', age: 16, desc: 'High school student. Lives on TikTok and Instagram. Very short attention span.' },
+  priya:  { emoji: '🏪', label: 'Priya', age: 55, desc: 'Small business owner. Uses phone primarily. Mobile-first mindset.' },
+  carlos: { emoji: '🔨', label: 'Carlos', age: 45, desc: 'Construction worker. Colorblind (deuteranopia). Prefers direct interactions.' },
 }
 
 export default function JourneyView({ journeys }) {
@@ -21,6 +21,7 @@ export default function JourneyView({ journeys }) {
   const journey = journeys?.[currentPersona]
   const steps = journey?.steps || []
   const step = steps[activeStep]
+  const personaMeta = currentPersona ? (PERSONA_META[currentPersona] || { emoji: '🙂', label: currentPersona }) : null
 
   if (!journeys || personas.length === 0) {
     return (
@@ -74,9 +75,27 @@ export default function JourneyView({ journeys }) {
         })}
       </div>
 
-      {/* Journey summary bar */}
+      {/* Persona description + journey summary bar */}
       {journey && (
         <div className="card" style={{ marginBottom: 16, display: 'flex', gap: 24, flexWrap: 'wrap', padding: '12px 18px' }}>
+          {personaMeta && (
+            <div style={{ maxWidth: 320 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <div style={{ fontSize: '1.4rem' }}>{personaMeta.emoji}</div>
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {personaMeta.label}
+                    {personaMeta.age && <span style={{ color: 'var(--text-3)', marginLeft: 4 }}>· Age {personaMeta.age}</span>}
+                  </div>
+                  {personaMeta.desc && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>
+                      {personaMeta.desc}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           <StatItem label="Steps" value={steps.length} />
           <StatItem label="Result" value={journey.task_completed ? '✅ Completed' : '❌ Failed'} />
           <StatItem label="Max Frustration" value={journey.max_frustration ?? '—'} />

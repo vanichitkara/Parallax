@@ -180,7 +180,7 @@ export default function App() {
             <span className="status-label">{running ? 'Test running…' : 'Idle'}</span>
           </div>
           {runId && <div className="run-id-label mono">run: {runId}</div>}
-          <button className="btn btn-ghost" style={{ width: '100%', marginTop: '1rem', fontSize: '0.8rem' }} onClick={handleLogout}>
+          <button className="btn btn-ghost btn-sign-out" onClick={handleLogout}>
             Sign Out
           </button>
         </div>

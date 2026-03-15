@@ -84,7 +84,6 @@ export default function LandingPage({ onLogin }) {
             </div>
             
             <h2>{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
-            <p>{isSignUp ? 'Join Parallax to start UX testing.' : 'Enter your credentials to access the dashboard.'}</p>
             
             <form onSubmit={handleLogin} className="login-form">
               {isSignUp && (
@@ -123,11 +122,8 @@ export default function LandingPage({ onLogin }) {
                 />
               </div>
               {error && <div className="error-text">⚠ {error}</div>}
-              <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%', marginTop: '1rem' }}>
-                {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Access Dashboard')}
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={() => setShowLogin(false)} style={{ width: '100%', marginTop: '0.5rem' }}>
-                Back
+               <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%', marginTop: '1rem' }}>
+                {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Login')}
               </button>
             </form>
           </div>

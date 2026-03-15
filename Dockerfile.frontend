@@ -13,7 +13,9 @@ RUN npm ci
 COPY frontend/ ./
 # Inject API URL at build time (overridden in docker-compose / Cloud Run)
 ARG VITE_API_URL=http://localhost:8000
+ARG VITE_GCS_BUCKET
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GCS_BUCKET=$VITE_GCS_BUCKET
 RUN npm run build
 
 # Stage 2: Serve with nginx

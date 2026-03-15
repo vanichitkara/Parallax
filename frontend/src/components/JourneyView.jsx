@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -31,11 +31,15 @@ export default function JourneyView({ journeys }) {
     )
   }
 
-  function screenshotUrl(persona, stepNum) {
-    const dir = journeys[persona]?.output_dir           // e.g. "martha_20260303_162907"
+  function getScreenshotUrl(persona, step) {
+    // If the step already has a full cloud URL, use it directly (best for production)
+    if (step?.screenshot_url && step.screenshot_url.startsWith('http')) {
+      return step.screenshot_url
+    }
+
+    const dir = journeys[persona]?.output_dir
     const files = journeys[persona]?.screenshot_files || []
-    // Match "step_01_navigate.png", "step_02_click_element.png", etc.
-    const prefix = `step_${String(stepNum).padStart(2, '0')}`
+    const prefix = `step_${String(step.step_number).padStart(2, '0')}`
     const file = files.find(f => f.startsWith(prefix))
     if (!file || !dir) return null
 
@@ -102,12 +106,10 @@ export default function JourneyView({ journeys }) {
           {step && (
             <div className="step-detail">
               {/* Screenshot */}
-              {(() => {
-                const src = screenshotUrl(currentPersona, step.step_number)
-                return src
-                  ? <img src={src} alt={`Step ${step.step_number}`} className="step-screenshot" onError={e => { e.target.style.display='none' }} />
-                  : <div className="persona-screenshot-placeholder" style={{ height: 200 }}>No screenshot for step {step.step_number}</div>
-              })()}
+              <ScreenshotReplay 
+                src={getScreenshotUrl(currentPersona, step)} 
+                stepNum={step.step_number} 
+              />
 
               <div className="step-detail-row">
                 <div className="detail-card">
@@ -157,6 +159,45 @@ export default function JourneyView({ journeys }) {
             </div>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+function ScreenshotReplay({ src, stepNum }) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  // Reset state when src changes
+  useEffect(() => {
+    setLoading(true)
+    setError(false)
+  }, [src])
+
+  if (!src) {
+    return <div className="persona-screenshot-placeholder" style={{ height: 200 }}>No screenshot for step {stepNum}</div>
+  }
+
+  return (
+    <div className="screenshot-container">
+      {loading && (
+        <div className="screenshot-loading">
+          <div className="skeleton" style={{ width: '100%', height: '100%' }} />
+          <div style={{ position: 'absolute', color: 'var(--text-3)', fontSize: '0.85rem', fontWeight: 600 }}>
+            🛰 LOADING SCREENSHOT...
+          </div>
+        </div>
+      )}
+      <img 
+        src={src} 
+        alt={`Step ${stepNum}`} 
+        className="step-screenshot" 
+        style={{ display: loading ? 'none' : 'block' }}
+        onLoad={() => setLoading(false)}
+        onError={() => { setLoading(false); setError(true) }}
+      />
+      {error && !loading && (
+        <div className="persona-screenshot-placeholder">Failed to load screenshot</div>
       )}
     </div>
   )

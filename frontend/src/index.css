@@ -124,6 +124,8 @@ body {
   font-weight: 600;
   cursor: pointer;
   border: none;
+  justify-content: center;
+  text-align: center;
   transition: all 0.18s ease;
 }
 .btn-primary {

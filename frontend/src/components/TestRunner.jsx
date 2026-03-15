@@ -1,13 +1,13 @@
 import { useState } from 'react'
 
 const ALL_PERSONAS = [
-  { id: 'martha', label: 'Martha', emoji: '👵', desc: '72 · Low tech' },
-  { id: 'raj',    label: 'Raj',    emoji: '👨‍💻', desc: '28 · Power user' },
-  { id: 'yuki',   label: 'Yuki',   emoji: '🌸', desc: '34 · ESL user' },
-  { id: 'sam',    label: 'Sam',    emoji: '♿', desc: '40 · Screen reader' },
-  { id: 'dev',    label: 'Dev',    emoji: '📱', desc: '16 · Gen Z' },
-  { id: 'priya',  label: 'Priya',  emoji: '🏪', desc: '55 · Mobile first' },
-  { id: 'carlos', label: 'Carlos', emoji: '🔨', desc: '45 · Colorblind' },
+  { id: 'martha', label: 'Martha', emoji: '👵', age: 72, desc: 'Retired schoolteacher. Uses iPad for email and Facebook only. Low tech proficiency.' },
+  { id: 'raj',    label: 'Raj',    emoji: '👨‍💻', age: 28, desc: 'Senior software engineer. Power user of every app. High technical skills.' },
+  { id: 'yuki',   label: 'Yuki',   emoji: '🌸', age: 34, desc: 'Marketing manager. English is second language. Intermediate technical proficiency.' },
+  { id: 'sam',    label: 'Sam',    emoji: '♿', age: 40, desc: 'Accountant. Legally blind, uses screen reader (JAWS). Screen reader accessibility testing.' },
+  { id: 'dev',    label: 'Dev',    emoji: '📱', age: 16, desc: 'High school student. Lives on TikTok and Instagram. Very short attention span.' },
+  { id: 'priya',  label: 'Priya',  emoji: '🏪', age: 55, desc: 'Small business owner. Uses phone primarily. Mobile-first mindset.' },
+  { id: 'carlos', label: 'Carlos', emoji: '🔨', age: 45, desc: 'Construction worker. Colorblind (deuteranopia). Prefers direct interactions.' },
 ]
 
 const DEMO_PRESETS = [
@@ -98,9 +98,12 @@ export default function TestRunner({ onRunStarted, running, authToken }) {
                 className={`persona-chip ${selectedPersonas.includes(p.id) ? 'selected' : ''}`}
                 onClick={() => togglePersona(p.id)}
                 disabled={running}
-                title={p.desc}
               >
-                {p.emoji} {p.label}
+                <div className="persona-chip-icon">{p.emoji}</div>
+                <div className="persona-chip-body">
+                  <div className="persona-chip-name">{p.label}, {p.age}</div>
+                  <div className="persona-chip-desc">{p.desc}</div>
+                </div>
               </button>
             ))}
           </div>

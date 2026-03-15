@@ -312,23 +312,24 @@ RULES:
                 "action": {"type": "give_up", "reason": f"API error: {str(e)}"},
             }
     
-    async def _save_screenshot(self, screenshot_b64: str, step_num: int, action: str):
-        """Save a screenshot to disk, and upload to GCS if configured."""
+    async def _save_screenshot(self, screenshot_b64: str, step_num: int, action: str) -> Optional[str]:
+        """Save a screenshot to disk, and upload to GCS if configured. Returns public URL if uploaded."""
         import base64
         filename = f"step_{step_num:02d}_{action}.png"
         filepath = self.output_dir / filename
         with open(filepath, "wb") as f:
             f.write(base64.b64decode(screenshot_b64))
             
+        public_url = None
         # Optional Cloud Storage upload
         try:
             from api.gcp_services import gcp_client
             if gcp_client.enabled:
-                gcp_client.upload_screenshot_str(self.output_dir.name, filename, str(filepath))
+                public_url = gcp_client.upload_screenshot_str(self.output_dir.name, filename, str(filepath))
         except ImportError:
             pass
             
-        return str(filepath)
+        return public_url or str(filepath)
     
     async def _execute_action(self, action: dict) -> tuple[str, str]:
         """
@@ -420,7 +421,7 @@ RULES:
                 return self.journey
             
             screenshot_b64 = nav_result["screenshot_base64"]
-            await self._save_screenshot(screenshot_b64, 1, "navigate")
+            screenshot_url = await self._save_screenshot(screenshot_b64, 1, "navigate")
             
             # Analyze the first screenshot
             print(f"  🤖 Analyzing screenshot with Gemini Vision...")
@@ -438,6 +439,7 @@ RULES:
                 outcome=f"Page loaded: {nav_result.get('page_title', '')}",
                 frustration_level=max(0, min(10, response.get("frustration_delta", 0))),
                 confusion_points=response.get("confusion_points", []),
+                screenshot_url=screenshot_url,
                 page_url=self.target_url,
                 page_title=nav_result.get("page_title", ""),
             )
@@ -474,7 +476,7 @@ RULES:
                     # Action returned no screenshot (give_up or task_complete handled above)
                     break
                 
-                await self._save_screenshot(screenshot_b64, step_num, action_type)
+                screenshot_url = await self._save_screenshot(screenshot_b64, step_num, action_type)
                 
                 # Update frustration
                 frustration_delta = response.get("frustration_delta", 0)
@@ -506,6 +508,7 @@ RULES:
                     outcome=action_desc,
                     frustration_level=self.cognitive.current_frustration,
                     confusion_points=response.get("confusion_points", []),
+                    screenshot_url=screenshot_url,
                     page_url=self.browser.page.url if self.browser.page else "",
                 )
                 self.journey.add_step(step)

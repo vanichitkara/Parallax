@@ -83,6 +83,7 @@ docker build \
     --platform linux/amd64 \
     -f Dockerfile.frontend \
     --build-arg VITE_API_URL="${BACKEND_URL}" \
+    --build-arg VITE_GCS_BUCKET="parallax-490117-parallax-screenshots" \
     -t "${FRONTEND_IMAGE}" .
 
 echo "▶ Pushing frontend image..."

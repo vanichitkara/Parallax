@@ -9,6 +9,7 @@ import asyncio
 import base64
 import os
 import time
+import secrets
 from typing import Optional
 
 from playwright.async_api import async_playwright, Page, Browser, Playwright
@@ -37,16 +38,38 @@ class BrowserTool:
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-web-security",
+                "--allow-running-insecure-content",
             ]
         )
-        self.page = await self.browser.new_page(
+        self.context = await self.browser.new_context(
             viewport={"width": viewport_width, "height": viewport_height},
             user_agent=(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
+                "Chrome/122.0.0.0 Safari/537.36"
             ),
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+            }
         )
+        
+        # Add stealth script to bypass most automation detectors
+        await self.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            window.chrome = { runtime: {} };
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        """)
+        
+        self.page = await self.context.new_page()
         self._is_setup = True
     
     async def navigate(self, url: str) -> dict:
@@ -63,9 +86,11 @@ class BrowserTool:
             await self.setup()
         
         try:
-            await self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            # Wait extra time for dynamic content
-            await self.page.wait_for_timeout(2000)
+            # Random jitter before navigation
+            await asyncio.sleep(0.5 + (secrets.randbelow(100) / 100.0))
+            await self.page.goto(url, wait_until="networkidle", timeout=45000)
+            # Wait extra time for dynamic transition
+            await self.page.wait_for_timeout(3000)
             screenshot_b64 = await self._take_screenshot("navigate")
             
             return {
@@ -124,10 +149,16 @@ class BrowserTool:
             clamped_y = max(0, min(y, self.viewport_height - 1))
             if clamped_x != x or clamped_y != y:
                 print(f"  ⚠️ Coordinates ({x},{y}) clamped to ({clamped_x},{clamped_y}) — was outside viewport")
+            old_url = self.page.url
             await self.page.mouse.click(clamped_x, clamped_y)
-            # Wait for any navigation or dynamic content
+            
+            # Wait for potential navigation or network activity
             try:
-                await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                # Give the SPA a moment to react
+                await self.page.wait_for_timeout(1500)
+                if self.page.url == old_url:
+                    # If still on same page, maybe it's a slow transition or SPA update
+                    await self.page.wait_for_load_state("networkidle", timeout=3000)
             except Exception:
                 pass
             await self.page.wait_for_timeout(1000)
@@ -250,11 +281,16 @@ class BrowserTool:
                 pass
             
             # Click the found element
-            await element.click(timeout=5000)
+            old_url = self.page.url
+            await element.click(timeout=8000)
             
             # Wait for any navigation or dynamic content
             try:
-                await self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                # Wait for SPA or traditional navigation
+                await self.page.wait_for_load_state("networkidle", timeout=5000)
+                if self.page.url == old_url:
+                    # Give it a bit more time if URL hasn't changed but it might be an async transition
+                    await self.page.wait_for_timeout(2000)
             except Exception:
                 pass
             await self.page.wait_for_timeout(1000)
@@ -589,6 +625,8 @@ class BrowserTool:
         """Close browser and cleanup resources."""
         if self.page:
             await self.page.close()
+        if hasattr(self, 'context') and self.context:
+            await self.context.close()
         if self.browser:
             await self.browser.close()
         if self.playwright:

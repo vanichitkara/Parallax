@@ -10,11 +10,19 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+load_dotenv()
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
+import secrets
+import jwt
+import bcrypt
+from api.gcp_services import gcp_client
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -40,17 +48,69 @@ _websocket_clients: dict[str, list[WebSocket]] = {}
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
+security = HTTPBasic()
+JWT_SECRET = os.getenv("JWT_SECRET", "parallax_secret_key_123")
+
+def verify_password(plain_password, hashed_password):
+    if not hashed_password:
+        return False
+    # bcrypt expects bytes
+    password_bytes = plain_password.encode('utf-8')
+    if isinstance(hashed_password, str):
+        hashed_bytes = hashed_password.encode('utf-8')
+    else:
+        hashed_bytes = hashed_password
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
+
+def get_password_hash(password):
+    # bcrypt expects bytes and returns bytes
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+async def verify_auth(credentials: HTTPBasicCredentials = Depends(security)):
+    user = await gcp_client.get_user_by_email(credentials.username)
+    if not user:
+        # Fallback to local admin for bootstrap/local dev
+        if credentials.username == os.getenv("API_USERNAME", "admin") and \
+           credentials.password == os.getenv("API_PASSWORD", "parallax"):
+            return credentials.username
+            
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    
+    if not verify_password(credentials.password, user.get("hashed_password")):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
 
 @app.on_event("startup")
 async def _preload_historical_runs():
-    """Scan output/ and load all historical pipeline reports into memory on startup."""
+    """Scan output/ and load all historical pipeline reports into memory on startup.
+    Also fetches recent runs from Firestore."""
+    
+    # 1. First fetch from Firestore
+    fs_runs = await gcp_client.list_runs(limit=20)
+    for r in fs_runs:
+        run_id = r.get("run_id")
+        if run_id:
+            r["historical"] = True
+            _runs[run_id] = r
+            
+    # 2. Backfill from local disk if not in Firestore
     if not OUTPUT_DIR.exists():
         return
     reports = sorted(OUTPUT_DIR.glob("pipeline_report_*.json"), key=lambda p: p.stat().st_mtime)
     for report_path in reports:
         try:
             report = json.loads(report_path.read_text())
-            # Derive a stable run_id from the filename timestamp
             run_id = report_path.stem.replace("pipeline_report_", "")[:8]
             if run_id in _runs:
                 continue
@@ -107,6 +167,15 @@ class TestResponse(BaseModel):
     status: str
     message: str
 
+class SignUpRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 # ---------------------------------------------------------------------------
 # Helper: stream stdout lines as WebSocket messages
 # ---------------------------------------------------------------------------
@@ -118,7 +187,7 @@ async def _broadcast(run_id: str, event: dict):
     for ws in clients:
         try:
             await ws.send_json(event)
-        except Exception:
+        except (WebSocketDisconnect, RuntimeError):
             dead.append(ws)
     for ws in dead:
         clients.remove(ws)
@@ -136,10 +205,12 @@ async def _run_pipeline(run_id: str, url: str, task: str, personas: list[str]):
     personas_str = ",".join(personas)
     cmd = [
         sys.executable,
+        "-u",
         str(Path(__file__).parent.parent / "run_pipeline.py"),
         "--personas", personas_str,
         "--url", url,
         "--task", task,
+        "--run-id", run_id,
         "--delay", "10",
     ]
 
@@ -161,13 +232,16 @@ async def _run_pipeline(run_id: str, url: str, task: str, personas: list[str]):
         exit_code = process.returncode
 
         # After pipeline completes, load the latest report
-        report = _load_latest_report()
-        journeys = _load_journeys_for_run(personas)
+        report = _load_latest_report(run_id=run_id)
+        journeys = _load_journeys_for_run(personas, run_id=run_id)
 
         _runs[run_id]["status"] = "complete" if exit_code == 0 else "error"
         _runs[run_id]["completed_at"] = datetime.now().isoformat()
         _runs[run_id]["report"] = report
         _runs[run_id]["journeys"] = journeys
+
+        # Save to Firestore
+        await gcp_client.save_run(run_id, _runs[run_id])
 
         await _broadcast(run_id, {
             "type": "complete",
@@ -183,9 +257,13 @@ async def _run_pipeline(run_id: str, url: str, task: str, personas: list[str]):
         await _broadcast(run_id, {"type": "error", "error": str(e), "run_id": run_id})
 
 
-def _load_latest_report() -> Optional[dict]:
-    """Load the most recently created pipeline report JSON."""
-    reports = sorted(OUTPUT_DIR.glob("pipeline_report_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+def _load_latest_report(run_id: str = None) -> Optional[dict]:
+    """Load the pipeline report JSON for this run."""
+    # If run_id is provided, search for report starting with pipeline_report_{run_id}_
+    # Otherwise fall back to most recent: pipeline_report_*
+    glob_pattern = f"pipeline_report_{run_id}_*.json" if run_id else "pipeline_report_*.json"
+    
+    reports = sorted(OUTPUT_DIR.glob(glob_pattern), key=lambda p: p.stat().st_mtime, reverse=True)
     if reports:
         try:
             return json.loads(reports[0].read_text())
@@ -194,12 +272,16 @@ def _load_latest_report() -> Optional[dict]:
     return None
 
 
-def _load_journeys_for_run(personas: list[str]) -> dict:
-    """Load the most recent journey.json for each persona."""
+def _load_journeys_for_run(personas: list[str], run_id: str = None) -> dict:
+    """Load the journey.json for each persona in this run."""
     journeys = {}
     for persona in personas:
+        # If run_id is provided, search for dir containing it: {persona}_{run_id}_*
+        # Otherwise fall back to most recent: {persona}_*
+        glob_pattern = f"{persona}_{run_id}_*/journey.json" if run_id else f"{persona}_*/journey.json"
+        
         dirs = sorted(
-            OUTPUT_DIR.glob(f"{persona}_*/journey.json"),
+            OUTPUT_DIR.glob(glob_pattern),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
@@ -217,20 +299,64 @@ def _load_journeys_for_run(personas: list[str]) -> dict:
     return journeys
 
 # ---------------------------------------------------------------------------
+# Auth Endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/signup")
+async def signup(req: SignUpRequest):
+    existing = await gcp_client.get_user_by_email(req.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+    
+    hashed = get_password_hash(req.password)
+    user_data = {
+        "name": req.name,
+        "email": req.email.lower(),
+        "hashed_password": hashed,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    success = await gcp_client.create_user(req.email, user_data)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to create user in Firestore (Check GCP config)")
+    
+    return {"message": "User created successfully"}
+
+@app.post("/login")
+async def login(req: LoginRequest):
+    user = await gcp_client.get_user_by_email(req.email)
+    if not user or not verify_password(req.password, user.get("hashed_password")):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    # Return basic auth token for simplicity in our current frontend setup
+    import base64
+    combined = f"{req.email.lower()}:{req.password}"
+    token = base64.b64encode(combined.encode()).decode()
+    
+    return {
+        "token": token,
+        "user": {
+            "name": user.get("name"),
+            "email": user.get("email")
+        }
+    }
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 @app.post("/test", response_model=TestResponse)
-async def start_test(req: TestRequest):
+async def start_test(req: TestRequest, username: str = Depends(verify_auth)):
     """Start a new UX test run. Returns a run_id to track progress."""
     run_id = str(uuid.uuid4())[:8]
     _runs[run_id] = {
         "run_id": run_id,
+        "username": username,
         "url": req.url,
         "task": req.task,
         "personas": req.personas,
         "status": "queued",
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
         "logs": [],
     }
     # Fire and forget
@@ -239,7 +365,7 @@ async def start_test(req: TestRequest):
 
 
 @app.get("/results/{run_id}")
-async def get_results(run_id: str):
+async def get_results(run_id: str, username: str = Depends(verify_auth)):
     """Get the full result for a completed run."""
     if run_id not in _runs:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -247,14 +373,32 @@ async def get_results(run_id: str):
 
 
 @app.get("/runs")
-async def list_runs():
-    """List all runs (most recent first)."""
-    runs = sorted(_runs.values(), key=lambda r: r.get("created_at", ""), reverse=True)
-    return {"runs": runs}
+async def list_runs(username: str = Depends(verify_auth)):
+    """List all runs (most recent first) for the current user."""
+    # 1. Fetch from Firestore (Historical)
+    firestore_runs = await gcp_client.list_runs(limit=50)
+    
+    # Filter by username and create a set of IDs to avoid duplicates
+    runs_map = {r["run_id"]: r for r in firestore_runs if r.get("username") == username}
+    
+    # 2. Add local in-memory runs (Active/Recent)
+    for run_id, run_data in _runs.items():
+        if run_data.get("username") == username:
+            # Overwrite or add local state (it might be newer/streaming)
+            runs_map[run_id] = run_data
+            
+    # 3. Sort by created_at DESC (latest first)
+    sorted_runs = sorted(
+        runs_map.values(), 
+        key=lambda r: r.get("created_at", "0000-00-00"), 
+        reverse=True
+    )
+    
+    return {"runs": sorted_runs}
 
 
 @app.get("/output/{persona}/screenshots")
-async def list_screenshots(persona: str):
+async def list_screenshots(persona: str, username: str = Depends(verify_auth)):
     """List screenshot files for the most recent run of a persona."""
     dirs = sorted(
         OUTPUT_DIR.glob(f"{persona}_*/"),
@@ -269,23 +413,27 @@ async def list_screenshots(persona: str):
 
 @app.websocket("/ws/{run_id}")
 async def websocket_endpoint(websocket: WebSocket, run_id: str):
-    """WebSocket endpoint for live pipeline progress streaming."""
+    """WebSocket endpoint for live pipeline progress streaming.
+    (WebSocket auth is tricky in browsers, so we rely on run_id being unguessable uuid)."""
     await websocket.accept()
 
     # Register client
     _websocket_clients.setdefault(run_id, []).append(websocket)
 
-    # Send current state immediately
-    if run_id in _runs:
-        await websocket.send_json({"type": "state", "run": _runs[run_id]})
-    else:
-        await websocket.send_json({"type": "error", "error": "Run not found"})
-
     try:
+        # Send current state immediately
+        if run_id in _runs:
+            await websocket.send_json({"type": "state", "run": _runs[run_id]})
+        else:
+            await websocket.send_json({"type": "error", "error": "Run not found"})
+
         # Keep alive until client disconnects
         while True:
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        # Client potentially closed connection before we finished sending, or just left
+        pass
+    finally:
         if run_id in _websocket_clients:
             try:
                 _websocket_clients[run_id].remove(websocket)

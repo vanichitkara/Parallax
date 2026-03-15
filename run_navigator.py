@@ -38,10 +38,11 @@ class NavigatorRunner:
     This is the core Day 1 loop: screenshot → analyze → act → repeat.
     """
     
-    def __init__(self, persona: Persona, target_url: str, task: str):
+    def __init__(self, persona: Persona, target_url: str, task: str, run_id: str | None = None):
         self.persona = persona
         self.target_url = target_url
         self.task = task
+        self.run_id = run_id
         self.browser = BrowserTool()
         self.cognitive = CognitiveModel(
             persona_name=persona.name,
@@ -65,7 +66,12 @@ class NavigatorRunner:
         self.conversation_history = []
         
         # Output directory for screenshots
-        self.output_dir = Path(f"output/{persona.name.lower()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        dir_name = f"{persona.name.lower()}_{timestamp}"
+        if run_id:
+            dir_name = f"{persona.name.lower()}_{run_id}_{timestamp}"
+            
+        self.output_dir = Path(f"output/{dir_name}")
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
     def _build_system_prompt(self) -> str:
@@ -307,11 +313,21 @@ RULES:
             }
     
     async def _save_screenshot(self, screenshot_b64: str, step_num: int, action: str):
-        """Save a screenshot to disk."""
+        """Save a screenshot to disk, and upload to GCS if configured."""
         import base64
-        filepath = self.output_dir / f"step_{step_num:02d}_{action}.png"
+        filename = f"step_{step_num:02d}_{action}.png"
+        filepath = self.output_dir / filename
         with open(filepath, "wb") as f:
             f.write(base64.b64decode(screenshot_b64))
+            
+        # Optional Cloud Storage upload
+        try:
+            from api.gcp_services import gcp_client
+            if gcp_client.enabled:
+                gcp_client.upload_screenshot_str(self.output_dir.name, filename, str(filepath))
+        except ImportError:
+            pass
+            
         return str(filepath)
     
     async def _execute_action(self, action: dict) -> tuple[str, str]:
@@ -429,8 +445,8 @@ RULES:
             self.cognitive.step()
             
             # Print what the persona saw
-            print(f"  👁️ {self.persona.name} sees: {response.get('observation', '')[:100]}...")
-            print(f"  💭 Thinking: {response.get('thinking', '')[:100]}...")
+            print(f"  👁️ {self.persona.name} sees: {response.get('observation', '')}")
+            print(f"  💭 Thinking: {response.get('thinking', '')}")
             print(f"  😤 Emotion: {response.get('emotion', 'neutral')}")
             
             # Log any UX issues found
@@ -451,7 +467,7 @@ RULES:
                     break
                 
                 # Execute the action
-                print(f"\n  📍 Step {step_num}: {action_type} — {action.get('reason', '')[:60]}...")
+                print(f"\n  📍 Step {step_num}: {action_type} — {action.get('reason', '')}...")
                 screenshot_b64, action_desc = await self._execute_action(action)
                 
                 if not screenshot_b64:
@@ -498,7 +514,7 @@ RULES:
                 # Print status
                 emotion = response.get("emotion", "neutral")
                 emoji = {"confused": "😕", "frustrated": "😤", "excited": "🤩", "anxious": "😰", "neutral": "😐"}.get(emotion, "😐")
-                print(f"  👁️ Sees: {response.get('observation', '')[:80]}...")
+                print(f"  👁️ Sees: {response.get('observation', '')}")
                 print(f"  {emoji} Feeling: {emotion} | Frustration: {self.cognitive.current_frustration}/{self.cognitive.frustration_threshold}")
                 
                 for issue in response.get("ux_issues", []):
@@ -553,6 +569,8 @@ async def main():
                        help="Target URL to test")
     parser.add_argument("--task", "-t", type=str, default="Find information about climate change and navigate to a related topic",
                        help="Task for the persona to complete")
+    parser.add_argument("--run-id", type=str, default=None,
+                       help="Specific run ID to associate with this test")
     
     args = parser.parse_args()
     
@@ -569,7 +587,7 @@ async def main():
     print(f"   Task: {args.task}")
     
     # Run the navigator
-    runner = NavigatorRunner(persona, args.url, args.task)
+    runner = NavigatorRunner(persona, args.url, args.task, run_id=args.run_id)
     journey = await runner.run()
     
     return journey

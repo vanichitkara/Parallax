@@ -13,21 +13,18 @@ const PERSONA_META = {
   carlos: { emoji: '🔨', label: 'Carlos', age: 45,  maxFrustration: 4 },
 }
 
-function parseLogLine(line) {
-  if (line.includes('📍 Step'))    return { type: 'step',    text: line }
-  if (line.includes('👁️') || line.includes('Sees:')) return { type: 'sees', text: line }
-  if (line.includes('😐') || line.includes('😤') || line.includes('😕') || line.includes('🤩') || line.includes('😡') || line.includes('Feeling:')) return { type: 'emotion', text: line }
-  if (line.includes('🔍 Issue'))   return { type: 'issue',   text: line }
-  if (line.includes('✅'))         return { type: 'done',    text: line }
-  if (line.includes('❌') || line.includes('gave up')) return { type: 'error', text: line }
-  return { type: 'normal', text: line }
-}
-
-function extractPersonaState(logs) {
+function extractPersonaState(logs, initialPersonas = []) {
   // Parse logs to build per-persona live state
   const states = {}
-  let currentPersona = null
+  
+  // Initialize with initialPersonas if provided
+  if (initialPersonas) {
+    initialPersonas.forEach(p => {
+      states[p.toLowerCase()] = { step: 0, stepLabel: '', sees: '', emotion: 'neutral', frustration: 0, done: false, success: false, issues: 0 }
+    })
+  }
 
+  let currentPersona = null
   for (const line of logs) {
     // Detect persona header
     const personaMatch = line.match(/🧑 (\w+) \(age/)
@@ -40,11 +37,21 @@ function extractPersonaState(logs) {
     if (!currentPersona) continue
 
     const s = states[currentPersona]
-    const stepMatch = line.match(/📍 Step (\d+): (.+?)\s*—/)
-    if (stepMatch) { s.step = parseInt(stepMatch[1]); s.stepLabel = stepMatch[2] }
+    
+    // Improved regex to handle both Step 1 and subsequent steps without cutting at dots (URLs)
+    const stepMatch = line.match(/📍 Step (\d+): ([^—]+?)(?:\s*—|$)/)
+    if (stepMatch) { 
+      s.step = parseInt(stepMatch[1]); 
+      s.stepLabel = stepMatch[2].trim() 
+    } else if (line.includes('📍 Step 1: Navigating to')) {
+      // Fallback for Step 1 specifically if regex is fussy
+      s.step = 1;
+      const navMatch = line.match(/Navigating to (.+)/);
+      if (navMatch) s.stepLabel = `Navigating to ${navMatch[1].trim()}`;
+    }
 
     const seesMatch = line.match(/(?:👁️|Sees:)\s*(.+)/)
-    if (seesMatch) s.sees = seesMatch[1].slice(0, 120)
+    if (seesMatch) s.sees = seesMatch[1]
 
     const frustMatch = line.match(/Frustration:\s*(\d+)/)
     if (frustMatch) s.frustration = parseInt(frustMatch[1])
@@ -54,14 +61,14 @@ function extractPersonaState(logs) {
 
     if (line.includes('🔍 Issue')) s.issues = (s.issues || 0) + 1
 
-    if (line.includes('✅') && line.includes('completed')) { s.done = true; s.success = true }
+    if (line.includes('✅') && (line.includes('completed') || line.includes('DONE') || line.includes('Pipeline complete'))) { s.done = true; s.success = true }
     if (line.includes('❌') && (line.includes('gave up') || line.includes('Gave up'))) { s.done = true; s.success = false }
   }
 
   return states
 }
 
-export default function LiveFeed({ runId, onComplete }) {
+export default function LiveFeed({ runId, onComplete, initialData }) {
   const [logs, setLogs] = useState([])
   const [personaStates, setPersonaStates] = useState({})
   const [status, setStatus] = useState('connecting')
@@ -71,7 +78,19 @@ export default function LiveFeed({ runId, onComplete }) {
   useEffect(() => {
     if (!runId) return
     setLogs([])
-    setPersonaStates({})
+    
+    // Initialize persona states from initialData if available
+    const initialPersonas = initialData?.personas || []
+    setPersonaStates(extractPersonaState([], initialPersonas))
+    
+    if (initialData && (initialData.status === 'complete' || initialData.status === 'error')) {
+      const histLogs = initialData.logs || []
+      setLogs(histLogs)
+      setPersonaStates(extractPersonaState(histLogs, initialPersonas))
+      setStatus(initialData.status)
+      return
+    }
+
     setStatus('connecting')
 
     const ws = new WebSocket(`${WS_BASE}/ws/${runId}`)
@@ -85,14 +104,14 @@ export default function LiveFeed({ runId, onComplete }) {
       const event = JSON.parse(evt.data)
 
       if (event.type === 'state') {
-        // Replay existing logs
         const existing = event.run?.logs || []
+        const personas = event.run?.personas || initialPersonas
         setLogs(existing)
-        setPersonaStates(extractPersonaState(existing))
+        setPersonaStates(extractPersonaState(existing, personas))
       } else if (event.type === 'log') {
         setLogs(prev => {
           const next = [...prev, event.line]
-          setPersonaStates(extractPersonaState(next))
+          setPersonaStates(extractPersonaState(next, initialPersonas))
           return next
         })
       } else if (event.type === 'complete') {
@@ -106,24 +125,22 @@ export default function LiveFeed({ runId, onComplete }) {
     return () => ws.close()
   }, [runId])
 
-  // Auto-scroll log
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [logs.length])
-
   const activePersonas = Object.keys(personaStates)
+  const isLive = status === 'connecting' || status === 'connected'
 
   return (
     <div className="live-feed">
       <div className="live-feed-header">
-        <h2>📡 Live Feed</h2>
-        <span className={`badge ${status === 'complete' ? 'badge-success' : status === 'error' ? 'badge-danger' : 'badge-info'}`}>
-          {status === 'connecting' ? '⟳ Connecting' : status === 'connected' ? '● Streaming' : status === 'complete' ? '✓ Complete' : status}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2>📡 Live Feed</h2>
+          <span className={`badge ${isLive ? 'badge-info' : 'badge-default'}`}>
+            {isLive ? (status === 'connecting' ? '⟳ Connecting' : '● Streaming') : 'Idle'}
+          </span>
+        </div>
       </div>
 
-      {/* Persona cards */}
-      {activePersonas.length > 0 && (
+      {/* Persona cards - only show when live */}
+      {isLive && activePersonas.length > 0 && (
         <div className="persona-cards">
           {activePersonas.map(pid => {
             const meta = PERSONA_META[pid] || { emoji: '🙂', label: pid, maxFrustration: 5 }
@@ -176,16 +193,6 @@ export default function LiveFeed({ runId, onComplete }) {
           })}
         </div>
       )}
-
-      {/* Log console */}
-      <div className="log-console">
-        {logs.length === 0 && <span style={{ color: 'var(--text-3)' }}>Waiting for pipeline output…</span>}
-        {logs.map((line, i) => {
-          const { type, text } = parseLogLine(line)
-          return <div key={i} className={`log-line ${type}`}>{text}</div>
-        })}
-        <div ref={logEndRef} />
-      </div>
     </div>
   )
 }

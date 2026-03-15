@@ -12,13 +12,13 @@ const ALL_PERSONAS = [
 
 const DEMO_PRESETS = [
   { label: 'National Insurance', url: 'https://nationalinsurance.nic.co.in/', task: 'Find the claims procedure for universal health insurance' },
-  { label: 'healthcare.gov', url: 'https://www.healthcare.gov/', task: 'Find out if you are eligible for health insurance and start an application' },
+  { label: 'GitHub Trending', url: 'https://github.com/trending', task: 'Browse the trending repositories and find the name of the top repository today' },
   { label: 'Wikipedia', url: 'https://en.wikipedia.org', task: 'Find information about climate change and navigate to a related topic' },
 ]
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export default function TestRunner({ onRunStarted, running }) {
+export default function TestRunner({ onRunStarted, running, authToken }) {
   const [url, setUrl] = useState('')
   const [task, setTask] = useState('')
   const [selectedPersonas, setSelectedPersonas] = useState(['martha', 'raj'])
@@ -43,12 +43,15 @@ export default function TestRunner({ onRunStarted, running }) {
     try {
       const res = await fetch(`${API_BASE}/test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Basic ${authToken}` } : {})
+        },
         body: JSON.stringify({ url: url.trim(), task: task.trim(), personas: selectedPersonas }),
       })
       const data = await res.json()
       if (res.ok) {
-        onRunStarted(data.run_id)
+        onRunStarted(data.run_id, selectedPersonas)
       } else {
         setError(data.detail || 'Failed to start test')
       }

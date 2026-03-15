@@ -37,8 +37,13 @@ export default function JourneyView({ journeys }) {
     // Match "step_01_navigate.png", "step_02_click_element.png", etc.
     const prefix = `step_${String(stepNum).padStart(2, '0')}`
     const file = files.find(f => f.startsWith(prefix))
-    if (file && dir) return `${API_BASE}/screenshots/${dir}/${file}`
-    return null
+    if (!file || !dir) return null
+
+    const bucket = import.meta.env.VITE_GCS_BUCKET
+    if (bucket) {
+      return `https://storage.googleapis.com/${bucket}/${dir}/${file}`
+    }
+    return `${API_BASE}/screenshots/${dir}/${file}`
   }
 
   return (

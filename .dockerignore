@@ -23,5 +23,4 @@ output/
 *.md
 docs/
 demo-app/
-cloud/
 tests/

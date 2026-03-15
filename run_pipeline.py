@@ -32,6 +32,8 @@ async def main():
                        help="Run all 7 personas")
     parser.add_argument("--delay", "-d", type=int, default=30,
                        help="Seconds between personas (rate limit protection)")
+    parser.add_argument("--run-id", type=str, default=None,
+                       help="Specific run ID to associate with this pipeline")
     
     args = parser.parse_args()
     
@@ -45,6 +47,7 @@ async def main():
         task=args.task,
         persona_names=persona_names,
         delay_between=args.delay,
+        run_id=args.run_id,
     )
 
 

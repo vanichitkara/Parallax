@@ -1,37 +1,31 @@
-# ================================================================
-# Parallax — Backend Dockerfile
-# FastAPI + Playwright + Python
-# ================================================================
+# Use official Python slim image (Debian Bookworm)
+FROM python:3.12-slim-bookworm
 
-# Use official Python slim image
-FROM python:3.12-slim
-
-# Prevent Python from buffering stdout (important for Cloud Run logs)
+# Prevent Python from buffering stdout
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-
-# Install system dependencies needed by Playwright / Chromium
-RUN apt-get update && apt-get install -y \
-    # Chromium runtime deps
-    libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
-    libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-    libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 \
-    libpangocairo-1.0-0 libgtk-3-0 libx11-xcb1 libxcb-dri3-0 \
-    # Fonts
-    fonts-liberation fonts-noto-color-emoji \
-    # Utilities
-    wget curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Set working directory
 WORKDIR /app
 
-# Copy and install Python deps first (better layer caching)
+# 1. Install system utilities and Python dependencies
+# We do this in one layer to keep the image small
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Playwright browsers (Chromium only to keep image small)
-RUN playwright install chromium --with-deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    gnupg \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir playwright \
+    # 2. Install ONLY Chromium and ONLY its required system deps
+    && playwright install chromium \
+    && playwright install-deps chromium \
+    # 3. Clean up APT and temporary files
+    && apt-get purge -y --auto-remove wget gnupg \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /root/.cache/pip \
+    && rm -rf /tmp/*
 
 # Copy application code
 COPY agents/     ./agents/
@@ -42,11 +36,11 @@ COPY tools/      ./tools/
 COPY run_navigator.py .
 COPY run_pipeline.py .
 
-# Create output directory for screenshots
+# Create output directory
 RUN mkdir -p /app/output
 
-# Cloud Run sets PORT env var; default to 8000 for local
+# Cloud Run sets PORT env var
 ENV PORT=8000
 
-# Start FastAPI with uvicorn
+# Start FastAPI
 CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 1"]

@@ -46,7 +46,7 @@ gcloud auth configure-docker --quiet
 echo ""
 echo "▶ Building backend image..."
 BACKEND_IMAGE="${REGISTRY}/${BACKEND_SERVICE}:latest"
-docker build -f Dockerfile -t "${BACKEND_IMAGE}" .
+docker build --platform linux/amd64 -f Dockerfile -t "${BACKEND_IMAGE}" .
 
 echo "▶ Pushing backend image..."
 docker push "${BACKEND_IMAGE}"
@@ -65,7 +65,7 @@ gcloud run deploy "${BACKEND_SERVICE}" \
     --concurrency=5 \
     --min-instances=0 \
     --max-instances=3 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash},GCS_BUCKET=parallax-screenshots" \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash},GCS_BUCKET=parallax-490117-parallax-screenshots" \
     --set-secrets="GOOGLE_API_KEY=parallax-api-key:latest" \
     --quiet
 
@@ -80,6 +80,7 @@ echo ""
 echo "▶ Building frontend image (API URL: ${BACKEND_URL})..."
 FRONTEND_IMAGE="${REGISTRY}/${FRONTEND_SERVICE}:latest"
 docker build \
+    --platform linux/amd64 \
     -f Dockerfile.frontend \
     --build-arg VITE_API_URL="${BACKEND_URL}" \
     -t "${FRONTEND_IMAGE}" .
@@ -97,6 +98,7 @@ gcloud run deploy "${FRONTEND_SERVICE}" \
     --allow-unauthenticated \
     --memory=256Mi \
     --cpu=1 \
+    --port=80 \
     --timeout=30 \
     --concurrency=80 \
     --min-instances=0 \

@@ -95,6 +95,7 @@ async def run_pipeline(
     task: str,
     persona_names: list[str] | None = None,
     delay_between: int = 30,
+    run_id: str | None = None,
 ) -> dict:
     """
     Run the full Parallax pipeline outside of ADK runtime.
@@ -148,7 +149,7 @@ async def run_pipeline(
         
         print(f"\n  [{i}/{len(persona_names)}] Running {persona.name}...")
         
-        runner = NavigatorRunner(persona, target_url, task)
+        runner = NavigatorRunner(persona, target_url, task, run_id=run_id)
         journey = await runner.run()
         
         result = {
@@ -248,7 +249,8 @@ Keep it actionable and specific. Reference persona names and their behaviors."""
     output_dir.mkdir(exist_ok=True)
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    report_path = output_dir / f"pipeline_report_{timestamp}.json"
+    report_tag = f"{run_id}_{timestamp}" if run_id else timestamp
+    report_path = output_dir / f"pipeline_report_{report_tag}.json"
     
     full_report = {
         "url": target_url,
@@ -263,7 +265,7 @@ Keep it actionable and specific. Reference persona names and their behaviors."""
         json.dump(full_report, f, indent=2)
     
     # Also save the text report
-    text_path = output_dir / f"ux_report_{timestamp}.md"
+    text_path = output_dir / f"ux_report_{report_tag}.md"
     with open(text_path, "w") as f:
         f.write(f"# Parallax UX Report\n\n")
         f.write(f"**URL:** {target_url}\n")

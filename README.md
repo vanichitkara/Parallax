@@ -39,7 +39,7 @@ Traditional QA is monolithic. Parallax creates **diverse AI personas** that brow
 
 ## 🏗️ Architecture
 
-<a href="https://ibb.co/hFcnPMV5"><img src="https://i.ibb.co/wh7b9L4H/Parallax-Architecture-Diagram.png" alt="Parallax-Architecture-Diagram" border="0"></a>
+<a href="https://ibb.co/9mvwZBJG"><img src="https://i.ibb.co/V0NHwbd3/Parallax-Architecture-Diagram.png" alt="Parallax-Architecture-Diagram" border="0"></a>
 
 ---
 

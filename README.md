@@ -1,4 +1,4 @@
-# 🔭 Parallax — Multimodal UX Intelligence
+# <img src="frontend/public/logo.png" width="40" height="40" valign="middle"> Parallax — Multimodal UX Intelligence
 
 > **One click. Infinite perspectives. Zero blind spots.**
 

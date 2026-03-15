@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './LandingPage.css'
+import logo from '../assets/logo.png'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -58,7 +59,7 @@ export default function LandingPage({ onLogin }) {
 
       <nav className="landing-nav">
         <div className="logo">
-          <span className="logo-icon">⟨P⟩</span>
+          <img src={logo} alt="Parallax" style={{ width: 32, height: 32, objectFit: 'contain', marginRight: 8 }} />
           <span className="logo-text">Parallax</span>
         </div>
         {!showLogin && <button className="btn btn-ghost" onClick={() => { setShowLogin(true); setIsSignUp(false); }}>Sign In</button>}
@@ -133,7 +134,6 @@ export default function LandingPage({ onLogin }) {
         ) : (
           <div className="hero-section fade-in">
             <div className="hero-content">
-              <div className="badge-pill">🚀 New: Claude & Gemini Vision Agents</div>
               <h1 className="hero-title">
                 Autopilot for<br/>
                 <span className="text-gradient">UX Testing</span>
@@ -206,6 +206,22 @@ export default function LandingPage({ onLogin }) {
           </div>
         </section>
       )}
+
+      <footer className="landing-footer">
+        <div className="footer-content">
+          <div className="footer-left">
+            <div className="logo footer-logo">
+              <img src={logo} alt="Parallax" style={{ width: 20, height: 20, objectFit: 'contain', marginRight: 6 }} />
+              <span>Parallax</span>
+            </div>
+            <p className="copyright">© 2026 Parallax AI. All rights reserved.</p>
+          </div>
+          <div className="footer-right">
+            <a href="https://github.com/vanichitkara/Parallax/blob/main/README.md">Documentation</a>
+            <a href="https://github.com/vanichitkara/Parallax">GitHub</a>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

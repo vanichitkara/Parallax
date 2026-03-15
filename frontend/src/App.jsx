@@ -6,6 +6,7 @@ import JourneyView from './components/JourneyView'
 import LandingPage from './components/LandingPage'
 import './index.css'
 import './App.css'
+import logo from './assets/logo.png'
 
 const TABS = ['Live Test', 'Journey Replay', 'UX Report']
 
@@ -112,7 +113,7 @@ export default function App() {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <div className="logo-mark">⟨P⟩</div>
+          <img src={logo} alt="Parallax" style={{ width: 32, height: 32, objectFit: 'contain' }} />
           <div>
             <div className="logo-title">Parallax</div>
             <div className="logo-sub">UX Intelligence</div>

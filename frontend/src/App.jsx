@@ -149,7 +149,8 @@ export default function App() {
               .filter(r => r.run_id !== activeRunId)
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
               .map(run => {
-                const title = run.task || run.url || `run: ${run.run_id}`
+                const baseTitle = run.short_title || run.task || run.url || `run: ${run.run_id}`
+                const title = baseTitle.length > 80 ? `${baseTitle.slice(0, 77)}…` : baseTitle
                 return (
                   <button
                     key={run.run_id}
@@ -157,7 +158,7 @@ export default function App() {
                     onClick={() => handleSelectRun(run)}
                   >
                     <div className="history-run-id">
-                      {title.length > 80 ? `${title.slice(0, 77)}…` : title}
+                      {title}
                     </div>
                     <div className="history-meta">
                       {new Date(run.created_at).toLocaleDateString()} {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {run.personas?.length} agent{run.personas?.length > 1 ? 's' : ''}

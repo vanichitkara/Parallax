@@ -24,6 +24,8 @@ import jwt
 import bcrypt
 from api.gcp_services import gcp_client
 
+from google import genai
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -50,6 +52,48 @@ OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 security = HTTPBasic()
 JWT_SECRET = os.getenv("JWT_SECRET", "parallax_secret_key_123")
+
+_gemini_client: Optional[genai.Client] = None
+
+
+def _get_gemini_client() -> Optional[genai.Client]:
+    """Lazily create a shared Gemini client, or return None if not configured."""
+    global _gemini_client
+    if _gemini_client is not None:
+        return _gemini_client
+
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return None
+
+    _gemini_client = genai.Client(api_key=api_key)
+    return _gemini_client
+
+
+async def _summarize_task_to_title(task: str) -> Optional[str]:
+    """Use Gemini to turn a freeform task into a short dashboard friendly title."""
+    client = _get_gemini_client()
+    if not client or not task:
+        return None
+
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    prompt = (
+        "Rewrite the following UX test task as a very short, 4–8 word title "
+        "suitable for a dashboard list item. Make it specific and scannable. "
+        "Output only the title, no quotes, no extra text.\n\n"
+        f"Task: {task}"
+    )
+
+    try:
+        resp = client.models.generate_content(
+            model=model,
+            contents=prompt,
+        )
+        text = (resp.text or "").strip()
+        return text or None
+    except Exception:
+        # If summarization fails, just fall back to raw task on the client
+        return None
 
 def verify_password(plain_password, hashed_password):
     if not hashed_password:
@@ -235,7 +279,24 @@ async def _run_pipeline(run_id: str, url: str, task: str, personas: list[str]):
         report = _load_latest_report(run_id=run_id)
         journeys = _load_journeys_for_run(personas, run_id=run_id)
 
-        _runs[run_id]["status"] = "complete" if exit_code == 0 else "error"
+        # Determine final status:
+        # - Non-zero exit code is always an error
+        # - Exit code 0 can still represent a failed run (e.g. all personas timed out / gave up)
+        status = "complete" if exit_code == 0 else "error"
+        if status == "complete" and isinstance(report, dict):
+            metrics = report.get("metrics") or {}
+            try:
+                total = int(metrics.get("total_personas") or 0)
+                completed = int(metrics.get("completed") or 0)
+                gave_up = int(metrics.get("gave_up") or 0)
+            except Exception:
+                total = completed = gave_up = 0
+
+            # If nothing completed (especially if everyone gave up), surface this as an error state in the UI.
+            if total > 0 and completed == 0 and gave_up >= total:
+                status = "error"
+
+        _runs[run_id]["status"] = status
         _runs[run_id]["completed_at"] = datetime.now().isoformat()
         _runs[run_id]["report"] = report
         _runs[run_id]["journeys"] = journeys
@@ -349,11 +410,13 @@ async def login(req: LoginRequest):
 async def start_test(req: TestRequest, username: str = Depends(verify_auth)):
     """Start a new UX test run. Returns a run_id to track progress."""
     run_id = str(uuid.uuid4())[:8]
+    short_title = await _summarize_task_to_title(req.task)
     _runs[run_id] = {
         "run_id": run_id,
         "username": username,
         "url": req.url,
         "task": req.task,
+        "short_title": short_title,
         "personas": req.personas,
         "status": "queued",
         "created_at": datetime.utcnow().isoformat() + "Z",
@@ -389,11 +452,11 @@ async def list_runs(username: str = Depends(verify_auth)):
             
     # 3. Sort by created_at DESC (latest first)
     sorted_runs = sorted(
-        runs_map.values(), 
-        key=lambda r: r.get("created_at", "0000-00-00"), 
-        reverse=True
+        runs_map.values(),
+        key=lambda r: r.get("created_at", "0000-00-00"),
+        reverse=True,
     )
-    
+
     return {"runs": sorted_runs}
 
 

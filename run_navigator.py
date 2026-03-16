@@ -18,6 +18,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv()

@@ -84,6 +84,18 @@ class GCPClient:
             print(f"⚠️ Firestore list error: {e}")
             return []
 
+    async def delete_run(self, run_id: str) -> bool:
+        """Delete a run from Firestore."""
+        if not self.enabled or not self.db:
+            return False
+        try:
+            doc_ref = self.db.collection('runs').document(run_id)
+            await doc_ref.delete()
+            return True
+        except Exception as e:
+            print(f"⚠️ Firestore delete error: {e}")
+            return False
+
     async def create_user(self, email: str, user_data: dict) -> bool:
         """Create a new user in Firestore."""
         if not self.enabled or not self.db:

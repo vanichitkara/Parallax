@@ -53,6 +53,7 @@ class NavigatorRunner:
             journey_id=str(uuid.uuid4()),
             persona_name=persona.name,
             persona_age=persona.age,
+            persona_tech_level=persona.tech_level,
             persona_background=persona.background,
             target_url=target_url,
             task=task,
@@ -440,6 +441,7 @@ RULES:
                 outcome=f"Page loaded: {nav_result.get('page_title', '')}",
                 frustration_level=max(0, min(10, response.get("frustration_delta", 0))),
                 confusion_points=response.get("confusion_points", []),
+                ux_issues=response.get("ux_issues", []),
                 screenshot_url=screenshot_url,
                 page_url=self.target_url,
                 page_title=nav_result.get("page_title", ""),
@@ -509,6 +511,7 @@ RULES:
                     outcome=action_desc,
                     frustration_level=self.cognitive.current_frustration,
                     confusion_points=response.get("confusion_points", []),
+                    ux_issues=response.get("ux_issues", []),
                     screenshot_url=screenshot_url,
                     page_url=self.browser.page.url if self.browser.page else "",
                 )

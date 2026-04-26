@@ -101,6 +101,31 @@ export default function App() {
     }
   }
 
+  async function handleDeleteRun(e, targetId) {
+    e.stopPropagation() // Don't select the run
+    if (!window.confirm("Are you sure you want to delete this run? This will remove it from Firestore and local disk.")) return
+
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    try {
+      const resp = await fetch(`${API_BASE}/runs/${targetId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Basic ${authToken}` }
+      })
+      if (resp.ok) {
+        setHistory(prev => prev.filter(r => r.run_id !== targetId))
+        if (runId === targetId) {
+          setRunId(null)
+          setRunData(null)
+        }
+      } else {
+        alert("Failed to delete run")
+      }
+    } catch (err) {
+      console.error("Delete error:", err)
+      alert("Error deleting run")
+    }
+  }
+
   function handleReturnToActive() {
     if (!activeRunId) return
     setRunId(activeRunId)
@@ -152,19 +177,44 @@ export default function App() {
                 const baseTitle = run.short_title || run.task || run.url || `run: ${run.run_id}`
                 const title = baseTitle.length > 80 ? `${baseTitle.slice(0, 77)}…` : baseTitle
                 return (
-                  <button
-                    key={run.run_id}
-                    className={`history-item ${runId === run.run_id ? 'active' : ''}`}
-                    onClick={() => handleSelectRun(run)}
-                  >
-                    <div className="history-run-id">
-                      {title}
-                    </div>
-                    <div className="history-meta">
-                      {new Date(run.created_at).toLocaleDateString()} {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {run.personas?.length} agent{run.personas?.length > 1 ? 's' : ''}
-                    </div>
-                    <div className={`history-status status-${run.status}`}>{run.status}</div>
-                  </button>
+                  <div key={run.run_id} className="history-item-wrapper" style={{ position: 'relative' }}>
+                    <button
+                      className={`history-item ${runId === run.run_id ? 'active' : ''}`}
+                      onClick={() => handleSelectRun(run)}
+                      style={{ paddingRight: '40px' }}
+                    >
+                      <div className="history-run-id">
+                        {title}
+                      </div>
+                      <div className="history-meta">
+                        {new Date(run.created_at).toLocaleDateString()} {new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {run.personas?.length} agent{run.personas?.length > 1 ? 's' : ''}
+                      </div>
+                      <div className={`history-status status-${run.status}`}>{run.status}</div>
+                    </button>
+                    <button 
+                      className="btn-delete-run"
+                      onClick={(e) => handleDeleteRun(e, run.run_id)}
+                      title="Delete Run"
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-3)',
+                        cursor: 'pointer',
+                        padding: '5px',
+                        fontSize: '1rem',
+                        opacity: 0.5,
+                        transition: 'opacity 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+                      onMouseOut={(e) => e.currentTarget.style.opacity = 0.5}
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 )
               })}
             {history.length === 0 && !running && <div className="history-empty">No previous runs</div>}
@@ -222,7 +272,7 @@ export default function App() {
             <JourneyView journeys={runData?.journeys} />
           )}
           {activeTab === 'UX Report' && (
-            <ReportView report={runData?.report} journeys={runData?.journeys} />
+            <ReportView report={runData?.report} journeys={runData?.journeys} onNavigate={setActiveTab} />
           )}
         </div>
       </main>

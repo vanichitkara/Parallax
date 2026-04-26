@@ -41,6 +41,7 @@ class JourneyStep(BaseModel):
     # Emotional state
     frustration_level: int = Field(ge=0, le=10, description="Current frustration 0-10")
     confusion_points: list[str] = Field(default_factory=list, description="Specific things that confused the persona")
+    ux_issues: list[dict] = Field(default_factory=list, description="UX issues identified in this step")
     
     # Screenshot reference
     screenshot_base64: Optional[str] = Field(default=None, description="Base64 encoded screenshot")
@@ -56,6 +57,7 @@ class Journey(BaseModel):
     journey_id: str
     persona_name: str
     persona_age: int
+    persona_tech_level: int = 0
     persona_background: str
     target_url: str
     task: str

@@ -281,20 +281,7 @@ async def _run_pipeline(run_id: str, url: str, task: str, personas: list[str]):
 
         # Determine final status:
         # - Non-zero exit code is always an error
-        # - Exit code 0 can still represent a failed run (e.g. all personas timed out / gave up)
         status = "complete" if exit_code == 0 else "error"
-        if status == "complete" and isinstance(report, dict):
-            metrics = report.get("metrics") or {}
-            try:
-                total = int(metrics.get("total_personas") or 0)
-                completed = int(metrics.get("completed") or 0)
-                gave_up = int(metrics.get("gave_up") or 0)
-            except Exception:
-                total = completed = gave_up = 0
-
-            # If nothing completed (especially if everyone gave up), surface this as an error state in the UI.
-            if total > 0 and completed == 0 and gave_up >= total:
-                status = "error"
 
         _runs[run_id]["status"] = status
         _runs[run_id]["completed_at"] = datetime.now().isoformat()
@@ -458,6 +445,53 @@ async def list_runs(username: str = Depends(verify_auth)):
     )
 
     return {"runs": sorted_runs}
+
+
+@app.delete("/runs/{run_id}")
+async def delete_run(run_id: str, username: str = Depends(verify_auth)):
+    """Delete a run from Firestore and disk."""
+    # 1. Check permissions
+    run = _runs.get(run_id)
+    if not run:
+        run = await gcp_client.get_run(run_id)
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+        
+    if run.get("username") != username:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    # 2. Delete from Firestore
+    await gcp_client.delete_run(run_id)
+
+    # 3. Remove from memory
+    if run_id in _runs:
+        del _runs[run_id]
+
+    # 4. Clean up local files
+    import shutil
+    try:
+        # Remove pipeline report
+        reports = list(OUTPUT_DIR.glob(f"pipeline_report_{run_id}_*.json"))
+        for r in reports:
+            r.unlink()
+        
+        # Remove ux report markdown
+        md_reports = list(OUTPUT_DIR.glob(f"ux_report_{run_id}_*.md"))
+        for m in md_reports:
+            m.unlink()
+
+        # Remove persona journey directories
+        # These are usually named {persona}_{run_id}_*
+        persona_dirs = list(OUTPUT_DIR.glob(f"*_{run_id}_*"))
+        for d in persona_dirs:
+            if d.is_dir():
+                shutil.rmtree(d)
+                
+    except Exception as e:
+        print(f"⚠️ Error cleaning up local files for {run_id}: {e}")
+
+    return {"message": f"Run {run_id} deleted successfully"}
 
 
 @app.get("/output/{persona}/screenshots")

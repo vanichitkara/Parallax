@@ -116,7 +116,7 @@ export default function JourneyView({ journeys }) {
                 onClick={() => setActiveStep(i)}
               >
                 <span className="step-num">Step {s.step_number}</span>
-                {s.action?.type || 'action'}
+                {s.action_type || s.action_details?.type || 'action'}
               </button>
             ))}
           </div>
@@ -142,9 +142,9 @@ export default function JourneyView({ journeys }) {
                 <div className="detail-card">
                   <h4>🎬 Action taken</h4>
                   <p>
-                    <strong>{step.action?.type}</strong>
-                    {step.action?.text && ` → "${step.action.text}"`}
-                    {step.action?.reason && <><br /><span style={{ color: 'var(--text-2)', fontSize: '0.8rem' }}>{step.action.reason}</span></>}
+                    <strong>{step.action_details?.type || step.action_type}</strong>
+                    {step.action_details?.text && ` → "${step.action_details.text}"`}
+                    {step.action_details?.reason && <><br /><span style={{ color: 'var(--text-2)', fontSize: '0.8rem' }}>{step.action_details.reason}</span></>}
                   </p>
                 </div>
                 <div className="detail-card">
